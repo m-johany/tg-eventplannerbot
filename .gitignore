@@ -1,5 +1,7 @@
-node_modules/*
-.*code-workspace
+node_modules/
+dist/
+.wrangler/
 .env
-.env_production
-data/*.db
+.env.production
+*.db
+*.db-journal
