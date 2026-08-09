@@ -1,11 +1,12 @@
 name = "telegram-event-bot"
 main = "src/index.ts"
 compatibility_date = "2025-08-09"
+account_id = "76ee4fa5b2d22bb9997cb168498fa5e8"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "eventplanner-db"
-database_id = "PLACEHOLDER"
+database_id = "40cc68e8-98e7-49a1-b242-41804c07aeb0"
 
 [observability]
 enabled = true
