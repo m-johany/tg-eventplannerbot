@@ -136,8 +136,6 @@ export function registerEventHandlers(bot: Bot, env: Env): void {
     const match = /^delete:(\d+)$/.exec(ctx.callbackQuery?.data ?? "");
     if (!match) return;
     const eventId = parseInt(match[1]!);
-    const user = ctx.callbackQuery?.from;
-    if (!user) return;
 
     try {
       const db = queries.getDB(env);

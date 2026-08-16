@@ -191,4 +191,31 @@ describe("requireCreatorOrAdmin", () => {
     expect(ctx.reply).toHaveBeenCalledWith(STRINGS.somethingWentWrong, { parse_mode: "HTML" });
     expect(next).not.toHaveBeenCalled();
   });
+
+  it("denies admins of a different chat than the event's home chat", async () => {
+    vi.mocked(getEvent).mockResolvedValue({
+      id: 42, chatId: 999, messageId: null, title: "T", description: null,
+      eventDate: null, location: null, attendeeLimit: null,
+      creatorId: 888, status: "active", createdAt: "x", updatedAt: "x",
+    });
+    const ctx = makeCtx({
+      callbackQuery: { data: "delete:42" },
+      getChatAdministrators: vi.fn().mockResolvedValue([makeMember(10)]),
+    });
+
+    await requireCreatorOrAdmin(env)(ctx, next);
+
+    expect(ctx.reply).toHaveBeenCalledWith(STRINGS.notCreator, { parse_mode: "HTML" });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("replies somethingWentWrong when the event lookup throws", async () => {
+    vi.mocked(getEvent).mockRejectedValue(new Error("db down"));
+    const ctx = makeCtx({ callbackQuery: { data: "delete:42" } });
+
+    await requireCreatorOrAdmin(env)(ctx, next);
+
+    expect(ctx.reply).toHaveBeenCalledWith(STRINGS.somethingWentWrong, { parse_mode: "HTML" });
+    expect(next).not.toHaveBeenCalled();
+  });
 });

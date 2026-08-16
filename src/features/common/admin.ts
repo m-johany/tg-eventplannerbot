@@ -51,14 +51,26 @@ export function requireCreatorOrAdmin(env: Env): MiddlewareFn<Context> {
     const chat = ctx.chat ?? ctx.message?.chat;
     const userId = ctx.from?.id;
     const eventId = parseEventId(ctx.callbackQuery?.data);
+    // Defense in depth: both router regexes in handlers.ts already guarantee a match,
+    // and chat/from are present on every registered callback route.
     if (!chat || userId === undefined || eventId === null) return;
     if (chat.type === "private") {
       await ctx.reply(STRINGS.groupOnly, { parse_mode: "HTML" });
       return;
     }
-    const event = await getEvent(getDB(env), eventId);
+    let event;
+    try {
+      event = await getEvent(getDB(env), eventId);
+    } catch {
+      await ctx.reply(STRINGS.somethingWentWrong, { parse_mode: "HTML" });
+      return;
+    }
     if (!event) {
       await ctx.reply(STRINGS.eventNotFound, { parse_mode: "HTML" });
+      return;
+    }
+    if (event.chatId !== chat.id) {
+      await ctx.reply(STRINGS.notCreator, { parse_mode: "HTML" });
       return;
     }
     if (event.creatorId === userId) return next();
