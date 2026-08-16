@@ -41,7 +41,7 @@ Create `src/features/common/__tests__/admin.test.ts`:
 
 ```typescript
 import { describe, it, expect } from "vitest";
-import type { ChatMember } from "grammy";
+import type { ChatMember } from "grammy/types";
 import { parseEventId, isAdmin } from "../admin";
 
 function makeMember(userId: number, status: ChatMember["status"] = "administrator"): ChatMember {
@@ -105,7 +105,7 @@ In `src/features/common/strings.ts`, inside the `STRINGS` object after `notCreat
 Create `src/features/common/admin.ts`:
 
 ```typescript
-import type { ChatMember } from "grammy";
+import type { ChatMember } from "grammy/types";
 
 export function parseEventId(data: string | undefined): number | null {
   if (!data) return null;
@@ -148,8 +148,8 @@ git commit -m "feat: add admin helpers parseEventId and isAdmin"
 **Interfaces:**
 - Consumes: `parseEventId`, `isAdmin` from Task 1; `getDB`, `getEvent` from `src/features/events/queries.ts` (existing: `getEvent(db, eventId): Promise<EventRow | undefined>`); `Env` from `src/features/common/types.ts`; `STRINGS` from `./strings`
 - Produces:
-  - `requireAdmin(): Middleware<Context>` — private chat → `groupOnly` + stop; non-admin → `adminOnly` + stop; admin fetch throws → `somethingWentWrong` + stop; admin → `next()`
-  - `requireCreatorOrAdmin(env: Env): Middleware<Context>` — private chat → `groupOnly` + stop; bad callback data → stop silently; event missing → `eventNotFound` + stop; creator → `next()` (no admin fetch); else admin check → `next()` or `notCreator` + stop; admin fetch throws → `somethingWentWrong` + stop
+  - `requireAdmin(): MiddlewareFn<Context>` — private chat → `groupOnly` + stop; non-admin → `adminOnly` + stop; admin fetch throws → `somethingWentWrong` + stop; admin → `next()`
+  - `requireCreatorOrAdmin(env: Env): MiddlewareFn<Context>` — private chat → `groupOnly` + stop; bad callback data → stop silently; event missing → `eventNotFound` + stop; creator → `next()` (no admin fetch); else admin check → `next()` or `notCreator` + stop; admin fetch throws → `somethingWentWrong` + stop
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -159,7 +159,8 @@ Top-of-file imports become:
 
 ```typescript
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { Context, ChatMember } from "grammy";
+import type { Context } from "grammy";
+import type { ChatMember } from "grammy/types";
 import { parseEventId, isAdmin, requireAdmin, requireCreatorOrAdmin } from "../admin";
 import { getEvent } from "../../events/queries";
 import { STRINGS } from "../strings";
@@ -326,7 +327,8 @@ Expected: FAIL — `requireAdmin` and `requireCreatorOrAdmin` not exported.
 Replace the contents of `src/features/common/admin.ts`:
 
 ```typescript
-import type { ChatMember, Context, Middleware } from "grammy";
+import type { Context, MiddlewareFn } from "grammy";
+import type { ChatMember } from "grammy/types";
 import { STRINGS } from "./strings";
 import { getDB, getEvent } from "../events/queries";
 import type { Env } from "./types";
@@ -351,7 +353,7 @@ async function fetchAdmins(ctx: Context): Promise<ChatMember[] | null> {
   }
 }
 
-export function requireAdmin(): Middleware<Context> {
+export function requireAdmin(): MiddlewareFn<Context> {
   return async (ctx, next) => {
     const chat = ctx.chat ?? ctx.message?.chat;
     const userId = ctx.from?.id;
@@ -373,7 +375,7 @@ export function requireAdmin(): Middleware<Context> {
   };
 }
 
-export function requireCreatorOrAdmin(env: Env): Middleware<Context> {
+export function requireCreatorOrAdmin(env: Env): MiddlewareFn<Context> {
   return async (ctx, next) => {
     const chat = ctx.chat ?? ctx.message?.chat;
     const userId = ctx.from?.id;
