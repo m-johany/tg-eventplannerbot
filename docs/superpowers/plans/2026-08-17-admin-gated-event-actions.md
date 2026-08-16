@@ -41,7 +41,7 @@ Create `src/features/common/__tests__/admin.test.ts`:
 
 ```typescript
 import { describe, it, expect } from "vitest";
-import type { ChatMember } from "grammy";
+import type { ChatMember } from "grammy/types";
 import { parseEventId, isAdmin } from "../admin";
 
 function makeMember(userId: number, status: ChatMember["status"] = "administrator"): ChatMember {
@@ -105,7 +105,7 @@ In `src/features/common/strings.ts`, inside the `STRINGS` object after `notCreat
 Create `src/features/common/admin.ts`:
 
 ```typescript
-import type { ChatMember } from "grammy";
+import type { ChatMember } from "grammy/types";
 
 export function parseEventId(data: string | undefined): number | null {
   if (!data) return null;
@@ -159,7 +159,8 @@ Top-of-file imports become:
 
 ```typescript
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { Context, ChatMember } from "grammy";
+import type { Context } from "grammy";
+import type { ChatMember } from "grammy/types";
 import { parseEventId, isAdmin, requireAdmin, requireCreatorOrAdmin } from "../admin";
 import { getEvent } from "../../events/queries";
 import { STRINGS } from "../strings";
@@ -326,7 +327,8 @@ Expected: FAIL — `requireAdmin` and `requireCreatorOrAdmin` not exported.
 Replace the contents of `src/features/common/admin.ts`:
 
 ```typescript
-import type { ChatMember, Context, Middleware } from "grammy";
+import type { Context, Middleware } from "grammy";
+import type { ChatMember } from "grammy/types";
 import { STRINGS } from "./strings";
 import { getDB, getEvent } from "../events/queries";
 import type { Env } from "./types";
