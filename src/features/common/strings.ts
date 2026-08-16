@@ -25,6 +25,8 @@ export const STRINGS = {
 
   eventNotFound: "Event not found.",
   notCreator: "Only the event creator can do that.",
+  adminOnly: "Only admins can create events.",
+  groupOnly: "Events work in group chats only.",
   invalidDate: "Invalid date format. Try: YYYY-MM-DD HH:MM",
   somethingWentWrong: "Something went wrong. Please try again.",
 } as const;
