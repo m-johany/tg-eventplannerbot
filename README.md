@@ -1,69 +1,135 @@
-# Create events in Telegram groups (bot)
+# Telegram Event Bot
 
-With this bot you can create events in Telegram groups. People can RSVP to the event just by clicking on "zusagen" (it's currently only available in German).
+Create events in Telegram groups. People RSVP with one tap — no chat spam, just a clean event card with a live attendee list.
 
-This makes it possible to get much less notifications in large groups. Instead of everyone writing "I'm in" etc. they can click on "zusagen" for which no extra notifications are created. It just shows a nice overview of everyone who already RSVP-ed.
+Built on Cloudflare Workers + D1. English only.
 
-![63650315-994cd480-c749-11e9-9787-97904e2d4a05](https://github.com/david-ziegler/TelegramEventBot/assets/3832093/0f88c52a-a391-4b62-9fe5-0ba77953b62d)
+## Features
 
+- `/event <text>` — instant event creation from a description (group admins only)
+- Inline event card with live RSVP button, attendee count, and attendee list
+- RSVP toggle — click to join, click again to opt out (server-guarded, no duplicates)
+- Delete events via the card's Delete button (event creator or group admin)
+- `/events` — list upcoming events in the chat
+- `/help` — command overview
 
-## How to add it to your group
+Planned: step-by-step wizard (`/event new`), event editing (title, date/time, location, attendee limit), reminders, polls, recurring events. See `PRD.md`.
 
-1. Open the Telegram group in which you would like to enable events.
-2. Open group "Info" and click "Edit" to go to group settings.
-3. Click on "Administrators" and "Add Admin"
-4. Type "@create_events_bot" in the search and choose the bot named "Event".
-5. Give the CreateEventsBot the right to "Delete Messages", everything else you can disable if you want.
-   The bot needs delete rights to work nicely since it deletes messages that start with "/event" and replaces them with the actual event. It will not delete anything else. Actually, the bot can only read messages that start with `/`
-6. Click on "Done" to add the bot to the group. It might ask whether you want to first add the bot as a member to the group and then promote it to admin. In that case click yes.
+## Commands
 
-## How to create an event
+| Command | Behavior |
+|---|---|
+| `/event <text>` | Create event instantly (group admins only) |
+| `/event new` | Step-by-step wizard (coming soon) |
+| `/event edit <id>` | Edit an event (coming soon) |
+| `/event cancel <id>` | Delete event, notify attendees (coming soon) |
+| `/events` | List upcoming events |
+| `/help` | Show available commands |
 
-1. In the group, type "/event Blablabla" as a message and send it. This will create an event with the description "Blablabla".
-2. Now people can RSVP by clicking on "Zusagen" or revert that by clicking on "doch nicht".
+## Permissions
 
-If you first want to try out how to use the bot, you can simply start a private message with @create_events_bot and create an event there that only you will see.
+- **Creating** events: Telegram group admins only.
+- **Deleting / editing** events: event creator or group admin.
+- **RSVP and listing**: everyone.
+- Private chats: event creation is disabled ("Events work in group chats only.").
 
-In the event description you can also use markdown (e.g. _bold_ text) and several lines (with Shift+Enter on a Computer you create a next line without sending the message) and of course emojis. More information on possible markdown styles here: https://core.telegram.org/bots/api#markdown-style.
+## How to add the bot to your group
 
-Currently, you can't edit or delete events. If you are a developer, Pull Requests are welcome.
+1. Open the Telegram group where you want events.
+2. Add the bot to the group and promote it to admin.
+3. Give it the "Delete Messages" right — the bot deletes the `/event` command message and replaces it with the event card. Nothing else is deleted.
+
+## Local development
+
+### Prerequisites
+
+- Node.js 18+
+- A Cloudflare account
+- A Telegram bot token from [BotFather](https://core.telegram.org/bots#how-do-i-create-a-bot)
+
+### Setup
+
+1. Clone the repository.
+2. `npm install`
+3. Create a D1 database:
+   ```bash
+   npx wrangler d1 create eventplanner-db
+   ```
+   Copy the returned `database_id` into `wrangler.toml`.
+4. Apply migrations locally:
+   ```bash
+   npm run db:migrate:local
+   ```
+5. Set your bot token locally:
+   ```bash
+   npx wrangler secret put BOT_TOKEN
+   ```
+6. Run the dev server:
+   ```bash
+   npm run dev
+   ```
+
+The bot uses webhooks (Workers cannot poll). For local development with a real Telegram bot, point the webhook at a tunnel (e.g. Cloudflare Tunnel) and set it via:
+
+```
+curl https://api.telegram.org/bot<TOKEN>/setWebhook?url=<WORKER_URL>/webhook
+```
+
+## Deploying
+
+1. Apply migrations to the remote D1 database:
+   ```bash
+   npm run db:migrate
+   ```
+2. Deploy:
+   ```bash
+   npm run deploy
+   ```
+3. Set the webhook on first deploy:
+   ```
+   curl https://api.telegram.org/bot<TOKEN>/setWebhook?url=<WORKER_URL>/webhook
+   ```
+
+## Development
+
+- `npm test` — run unit tests (Vitest)
+- `npm run typecheck` — TypeScript strict check
+- `npm run db:generate` — regenerate Drizzle migrations
+
+### Project structure
+
+```
+src/
+  features/
+    events/
+      handlers.ts     → bot command/callback handlers
+      service.ts      → business logic
+      queries.ts      → DB read/write
+      wizard.ts       → conversation wizard (planned)
+    common/
+      strings.ts      → all English UI text
+      helpers.ts      → shared utilities
+      admin.ts        → admin-check middlewares
+      types.ts        → shared TypeScript types
+  db/
+    schema.ts         → Drizzle table definitions
+    migrations/       → generated SQL migrations
+  bot.ts              → grammy instance, route setup
+  index.ts            → Cloudflare Worker entry (fetch handler)
+```
+
+## Tech Stack
+
+| Layer | Choice |
+|---|---|
+| Runtime | Cloudflare Workers |
+| Database | D1 (SQLite) |
+| ORM | Drizzle ORM |
+| Bot library | grammy (webhook mode) |
+| Date handling | Luxon |
+| Language | TypeScript (strict) |
+| Testing | Vitest |
 
 ## Contributing
 
-### Local development
-
-1. Clone this repository. 
-2. In order to be able to send and receive message via Telegram you first need to create a bot: [Create a bot with botfather](https://core.telegram.org/bots#3-how-do-i-create-a-bot). There you get a token.
-3. In the terminal, go to the app's folder with `cd createEventsBot`.
-4. Create a database by running `yarn install`, `mkdir data` and `npx sqlite3 ./data/development.db`.
-5. Create the database-tables by running the following three commands:
-```
-sqlite3 ./data/development.db
-> CREATE TABLE "events" ("id" INTEGER NOT NULL UNIQUE,"chat_id" INTEGER NOT NULL,"message_id" INTEGER NOT NULL,"description" TEXT NOT NULL,PRIMARY KEY("id" AUTOINCREMENT));
-> CREATE TABLE "attendees" ("id" INTEGER NOT NULL UNIQUE,"event_id" INTEGER NOT NULL,"user_id" INTEGER NOT NULL,"name" TEXT NOT NULL,FOREIGN KEY("event_id") REFERENCES "events"("id"),PRIMARY KEY("id" AUTOINCREMENT));
-```
-
-3. Rename the file `.env_example` to `.env` and set `DEV_BOT_TOKEN` to the token, you've got from BotFather. 
-4. Then run `yarn watch`.
-
-Now the bot is started in watch-mode, i.e. whenever you make changes to the code and save them, the bot automatically updates. You can now open Telegram (on the computer or phone) and use the bot (like in "How to create an event"). 
-
-### Create your own bot with your changes
-
-Follow the steps under "Local development"
-
-You might find it useful to create two different bots, one for local development and one for production (for the outside world). In that case, create another bot with BotFather and paste the respective token into the `.env`-file under `PROD_BOT_TOKEN`.
-
-For deployment I found [uberspace](https://uberspace.de/) really nice.
-
-Also, feel free to make a Pull Request here with your changes if they might be useful to integrate into the CreateEventsBot!
-
-### Any Questions?
-
-Feel free to send me a message if anything doesn't work.
-
-### Used technology & acknowledgements
-
-We use [node-telegram-bot-api](https://github.com/yagop/node-telegram-bot-api), [node-telegram-keyboard-wrapper](https://github.com/alexandercerutti/node-telegram-keyboard-wrapper) and [sqlite3](https://github.com/mapbox/node-sqlite3).
-
-You may find these documentations useful: [node-telegram-bot-api documentation](https://github.com/yagop/node-telegram-bot-api/blob/0b8ca03b54ac3361c2f656e2fa23c0e4423e49e5/doc/api.md), [Telegram API documentation](https://core.telegram.org/bots/api).
+Pull requests welcome. Check `AGENTS.md` for project context, conventions, and current state.
