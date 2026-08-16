@@ -2,11 +2,12 @@ import { Bot, InlineKeyboard, Context } from "grammy";
 import * as service from "./service";
 import * as queries from "./queries";
 import { STRINGS } from "../common/strings";
+import { requireAdmin, requireCreatorOrAdmin } from "../common/admin";
 import type { Env } from "../common/types";
 
 export function registerEventHandlers(bot: Bot, env: Env): void {
   // /event <text> — quick create
-  bot.command("event", async (ctx: Context) => {
+  bot.command("event", requireAdmin(), async (ctx: Context) => {
     const text = ctx.match?.toString().trim();
     if (!text || text === "new" || text === "edit" || text === "cancel") {
       if (text === "new") {
@@ -131,12 +132,10 @@ export function registerEventHandlers(bot: Bot, env: Env): void {
   });
 
   // Delete callback
-  bot.callbackQuery(/^delete:(\d+)$/, async (ctx: Context) => {
+  bot.callbackQuery(/^delete:(\d+)$/, requireCreatorOrAdmin(env), async (ctx: Context) => {
     const match = /^delete:(\d+)$/.exec(ctx.callbackQuery?.data ?? "");
     if (!match) return;
     const eventId = parseInt(match[1]!);
-    const user = ctx.callbackQuery?.from;
-    if (!user) return;
 
     try {
       const db = queries.getDB(env);
@@ -144,10 +143,6 @@ export function registerEventHandlers(bot: Bot, env: Env): void {
       if (!event) {
         return ctx.answerCallbackQuery(STRINGS.eventNotFound);
       }
-      if (event.creatorId !== user.id) {
-        return ctx.answerCallbackQuery(STRINGS.notCreator);
-      }
-
       await queries.cancelEvent(db, eventId);
 
       if (event.messageId) {
@@ -169,7 +164,7 @@ export function registerEventHandlers(bot: Bot, env: Env): void {
   });
 
   // Edit callback (placeholder)
-  bot.callbackQuery(/^edit:(\d+)$/, async (ctx: Context) => {
+  bot.callbackQuery(/^edit:(\d+)$/, requireCreatorOrAdmin(env), async (ctx: Context) => {
     await ctx.answerCallbackQuery("Edit feature coming soon!");
   });
 
