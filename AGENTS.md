@@ -1,34 +1,44 @@
 # Agent Context: Telegram Event Planner Bot
 
-Session date: 2026-08-09
+Session date: 2026-08-17 (last updated)
 
 ---
 
-## State: Design Complete, Ready to Scaffold
+## State: MVP Partially Built — Quick Create + RSVP + Admin Gating Done
 
-All architectural decisions made. PRD written. Implementation starts now.
-
----
-
-## Decisions Log (from grilling session)
-
-| # | Decision | Choice | Rationale |
-|---|---|---|---|
-| Q1 | Core scope | B + C: date/time events + full management | Polls, recurring, limits, waitlists |
-| Q2 | Codebase strategy | Rewrite from scratch | Old code: no tests, German hardcoded, no migrations, `any` types. Fresh foundation needed |
-| Q3 | Language/runtime | TypeScript + Node (Cloudflare Workers) | Same ecosystem, grammy is TS-first |
-| Q4 | Database | D1 (SQLite) + Drizzle ORM | Managed, Worker-native, Drizzle gives migrations + typed queries |
-| Q5 | Bot library | grammy | TS-first, middleware pattern, conversation plugin, active community |
-| Q6 | Command interface | Hybrid (C): quick + wizard | `/event Pizza` = instant, `/event new` = wizard, edit-after-create |
-| Q7 | Subcommands | Overloaded `/event` | Single namespace, discoverable via `/event [tab]` |
-| Q8 | MVP scope | Quick event, wizard, date/time, edit/cancel, calendar list, English | Post-MVP → GitHub issues |
-| Q9 | i18n | English only, no framework | Keep it simple |
-| Q10 | Testing | Unit tests for core logic (Vitest) | Mock Telegram, skip integration tests for now |
-| Q11 | Date library | Luxon | First-class timezone support, critical for event planning |
-| Q12 | Project structure | Feature-based | `features/events/`, `features/common/`, `db/` — scales to polls/reminders later |
-| Q13 | Deployment | Cloudflare Workers + Wrangler | No server, D1 native, Queues for reminders, webhook mode |
+Deployed baseline works: quick event creation, RSVP toggle, delete, `/events` list. Admin gating merged. Wizard + edit + attendee limits still missing.
 
 ---
+
+## What's Done (as of 2026-08-17)
+
+| Feature | State |
+|---|---|
+| Project scaffold (Workers + grammy + Drizzle + Vitest) | ✅ deployed |
+| D1 schema (`events`, `attendees`) + migration | ✅ deployed |
+| `/event <text>` quick create + event card + delete command message | ✅ |
+| RSVP toggle (server-guarded unique per user) | ✅ |
+| Delete event (creator-only via inline button) | ✅ |
+| `/events` list sorted by date | ✅ |
+| `/help` | ✅ |
+| **Admin gating (2026-08-17)** | ✅ merged, **not deployed** |
+| Wizard `/event new` | ❌ stub ("Wizard coming soon") |
+| Edit event (title/date/location/limit) | ❌ stub ("Edit feature coming soon") |
+| `/event edit <id>` / `/event cancel <id>` text commands | ❌ not registered |
+| Delete → notify attendees | ❌ not implemented |
+| `/events` pagination | ❌ not implemented |
+| Post-MVP (polls, recurring, waitlists, reminders, ICS, inline) | ❌ untouched |
+
+## Admin Gating (2026-08-17)
+
+- `/event` (create): Telegram **group admins only**. Private chats denied ("Events work in group chats only.").
+- `delete:` / `edit:` callbacks: event **creator OR group admin**.
+- `/events`, `/help`, RSVP: open to everyone.
+- Admin fetch via `getChatAdministrators()`; **fails closed** on API errors (deny, never allow).
+- Cross-chat guard: event card forwarded to another group cannot be acted on there (`event.chatId !== chat.id` check).
+- Code: `src/features/common/admin.ts` — `requireAdmin()`, `requireCreatorOrAdmin(env)`, pure helpers `parseEventId` / `isAdmin`. Tests: 31 passing.
+- Design: `docs/superpowers/specs/2026-08-17-admin-gated-event-actions-design.md`. Plan: `docs/superpowers/plans/2026-08-17-admin-gated-event-actions.md`.
+- Merged via PR #11 (squash, commit `6d6c50c`). **Not yet deployed** — `npm run deploy` pending.
 
 ## Stack Summary
 
@@ -40,45 +50,40 @@ Cloudflare Workers → grammy (webhook) → Drizzle → D1 (SQLite)
                             Wrangler (CLI)
 ```
 
----
+## Cloudflare / Deployment
 
-## Key Differences from Old Bot
+- Worker: `telegram-event-bot`, account `76ee4fa5b2d22bb9997cb168498fa5e8`
+- D1: `eventplanner-db` (`40cc68e8-98e7-49a1-b242-41804c07aeb0`), binding `DB`
+- Bot token: `wrangler secret put BOT_TOKEN` (secret lives in Cloudflare, not repo)
+- Deploy: `npm run deploy`; webhook configured at `/webhook` on first deploy
+- DB migrate: `npm run db:migrate`
 
-| Aspect | Old Bot | New Bot |
-|---|---|---|
-| Runtime | VPS + polling | Workers + webhooks |
-| DB | Raw sqlite3, manual SQL | D1 + Drizzle ORM + migrations |
-| Bot lib | node-telegram-bot-api | grammy |
-| Language | TypeScript, lax | TypeScript, strict |
-| Tests | None | Vitest unit tests |
-| Commands | `/event` only | `/event`, `/event new`, `/event edit`, `/event cancel`, `/events` |
-| Date | None | Luxon + timezone-aware |
-| i18n | Hardcoded German | English strings file |
-| Features | RSVP only | RSVP + date + edit + delete + calendar + polls (post-MVP) + recurring (post-MVP) |
+## Workflow Notes (important for agents)
+
+- Feature-based structure: `src/features/events/` (handlers, service, queries, wizard), `src/features/common/` (strings, helpers, types, admin)
+- All user-facing strings in `src/features/common/strings.ts`, English only
+- grammy 1.45 quirks: `ChatMember` imports from `"grammy/types"` (NOT root); middleware factory return type is `MiddlewareFn<Context>` (NOT `Middleware<Context>` — union, no call signatures)
+- Parse mode HTML everywhere
+- Tests: `npm test` (Vitest), typecheck: `npx tsc --noEmit`. Both must stay green.
+- Superpowers workflow used: spec → plan → subagent-driven execution → final review. Specs in `docs/superpowers/specs/`, plans in `docs/superpowers/plans/`.
 
 ---
 
 ## Next Steps (for next session)
 
-1. Delete old source files (keep `.git`)
-2. `npm init` / `wrangler init` to scaffold project
-3. Install deps: `grammy`, `drizzle-orm`, `drizzle-kit`, `luxon`, `vitest`
-4. Set up `wrangler.toml` with D1 binding
-5. Create D1 database: `wrangler d1 create eventplanner-db`
-6. Write Drizzle schema from PRD
-7. Run first migration
-8. Build `src/bot.ts` — grammy instance, webhook callback, route registration
-9. Build `src/features/events/` — handlers, service, queries
-10. Implement quick `/event` → RSVP card (core loop first)
-11. Implement wizard `/event new`
-12. Implement edit/delete
-13. Implement `/events` list
-14. Unit tests for core logic
-15. Deploy: `wrangler deploy` + set webhook
+1. **Deploy current state**: `npm run deploy` — admin gating is merged but not live.
+2. Wizard `/event new` — `src/features/events/wizard.ts` is an empty stub; spec'd in PRD (name → date/time → location → confirm, skip/back/cancel).
+3. Edit flow — per-field edit via inline buttons (title, date/time, location, attendee limit).
+4. Attendee limit — column exists in schema, no UI.
+5. `/event edit <id>` / `/event cancel <id>` text commands.
+6. Delete → notify attendees.
+7. `/events` pagination.
 
 ---
 
 ## Files to Reference
 
 - `PRD.md` — full requirements, DB schema, command spec
+- `docs/superpowers/specs/2026-08-17-admin-gated-event-actions-design.md` — admin feature design
+- `docs/superpowers/plans/2026-08-17-admin-gated-event-actions.md` — admin feature implementation plan
 - Old bot source in git history: `src/bot.ts`, `src/usecases.ts`, `src/core.ts`, `src/db.ts` — reference for Telegram integration patterns
